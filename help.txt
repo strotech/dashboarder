@@ -1,0 +1,18 @@
+Setting up react project
+	npx create-react-app dashboard
+	cd dashboard
+	yarn eject
+	remove node_modules and yarn.lock
+	yarn install
+
+Setting up react-bootstrap
+	yarn add react-bootstrap bootstrap
+	create App.scss file and remove App.css file. Then refer to App.scss in App.js instead of App.css
+	yarn add node-sass
+	
+	/* The following line can be included in a src/App.scss */
+	@import "~bootstrap/scss/bootstrap";
+	/* The following line can be included in your src/index.js or App.js file */
+	import './App.scss';
+ 
+https://github.com/creativetimofficial/light-bootstrap-dashboard-react
