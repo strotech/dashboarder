@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { BrowserRouter, Route, Switch, Redirect } from "react-router-dom";
 import reportWebVitals from './reportWebVitals';
 
-import './styles/main.scss';
+import './assets/styles/main.scss';
 
 import AdminLayoutContainer from "./components/containers/layouts/AdminLayoutContainer";
  

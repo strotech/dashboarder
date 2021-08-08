@@ -1,13 +1,18 @@
 import React from "react";
-import {  NavLink } from "react-router-dom";
+import {  useLocation, NavLink } from "react-router-dom";
 
 import { Nav } from "react-bootstrap";
 
-import sidebarImage from "../../assets/img/sidebar-3.jpg";
+import sidebarImage from "../../../assets/img/sidebar-3.jpg";
+
 
 const SidebarPanel=(props)=> {
 
     const {routes} = props;
+    const location = useLocation();
+    const activeRoute = (routeName) => {
+      return location.pathname.indexOf(routeName) > -1 ? "active" : "";
+    };
   
   return (
     <div className="sidebar"  data-color='black'>
@@ -25,7 +30,7 @@ const SidebarPanel=(props)=> {
           >
             <div className="logo-img">
               <img
-                src={require("../../assets/img/reactlogo.png").default}
+                src={require("../../../assets/img/reactlogo.png").default}
                 alt="..."
               />
             </div>
@@ -38,7 +43,8 @@ const SidebarPanel=(props)=> {
           {routes.map((prop, key) => {
             if (!prop.redirect)
               return (
-                <li                  
+                <li     
+                  className={activeRoute(prop.layout + prop.path)}             
                   key={key}
                 >
                   <NavLink
@@ -46,7 +52,7 @@ const SidebarPanel=(props)=> {
                     className="nav-link"
                     activeClassName="active"
                   >
-                    {/* <i className={prop.icon} /> */}
+                    <i className={prop.icon} />
                     <p>{prop.name}</p>
                   </NavLink>
                 </li>
