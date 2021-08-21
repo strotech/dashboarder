@@ -1,0 +1,10 @@
+https://medium.com/@asishrs/automated-and-authenticated-apis-stack-using-lambda-api-gateway-and-cloudformation-aws-ada7059030c2
+
+aws cloudformation validate-template --template-body file://cft2.yaml
+aws cloudformation deploy --stack-name twitter-lambda-api --template-file cft2.yaml --capabilities CAPABILITY IAM
+aws apigateway get-rest-apis
+aws apigateway get-api-keys --include-value
+
+curl -X GET \
+https://rr17ne1wog.execute-api.us-east-1.amazonaws.com/v1/hello \
+ -H 'x-api-key: OHmVEjbVucasYZHi5EYaz23CXXfdBToeaipKjvV8'
