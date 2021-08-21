@@ -43,7 +43,7 @@ Resources:
       ResourceId: !Ref ProxyResource
       HttpMethod: GET
       ApiKeyRequired: true
-      AuthorizationType: NONE
+      AuthorizationType: AWS_IAM
       OperationName: !Ref "apiResourcePath"
       Integration:
         Type: AWS_PROXY
