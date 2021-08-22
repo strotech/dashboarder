@@ -3,6 +3,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: AWS API Gateway with a Lambda Integration
 
 Parameters:
+  dummyLambdaFunctionName:
+    Type: "String"
+    AllowedPattern: "^[a-zA-Z0-9]+[a-zA-Z0-9-]+[a-zA-Z0-9]+$"
+    Description: Dummy Lambda function name. 
+    Default: "dummy-lambda-api"
   twitterLambdaFunctionName:
     Type: "String"
     AllowedPattern: "^[a-zA-Z0-9]+[a-zA-Z0-9-]+[a-zA-Z0-9]+$"
@@ -14,8 +19,12 @@ Parameters:
     Default: "v1"
   apiResourcePath:
     Type: "String"
-    Description: Resource Path for API.
+    Description: Dummy Resource Path for API.
     Default: "hello"
+  twitterResourcePath:
+    Type: "String"
+    Description: Twitter Resource Path for API.
+    Default: "covid19"
 
 Resources:
 
@@ -36,6 +45,7 @@ Resources:
       ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
       PathPart: !Ref "apiResourcePath"
 
+
   ProxyResourceANY:
     Type: 'AWS::ApiGateway::Method'
     Properties:
@@ -43,12 +53,45 @@ Resources:
       ResourceId: !Ref ProxyResource
       HttpMethod: GET
       ApiKeyRequired: true
-      AuthorizationType: AWS_IAM
+      AuthorizationType: NONE     #AWS_IAM
       OperationName: !Ref "apiResourcePath"
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction.Arn}/invocations'
+
+
+  TwitterApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      ApiKeySourceType: HEADER
+      Description: An API Gateway for Lambda APIs
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: !Join ["", [{"Ref": "AWS::StackName"}, "-twitter-api"]]
+
+  TwitterProxyResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref TwitterApiGatewayRestApi
+      ParentId: !GetAtt TwitterApiGatewayRestApi.RootResourceId
+      PathPart: !Ref "twitterResourcePath"
+
+  TwitterProxyResourceANY:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref TwitterApiGatewayRestApi
+      ResourceId: !Ref TwitterProxyResource
+      HttpMethod: GET
+      ApiKeyRequired: true
+      AuthorizationType: NONE        #AWS_IAM
+      OperationName: !Ref "twitterResourcePath"
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TwitterLambdaFunction.Arn}/invocations'
+
 
   ApiGatewayModel:
     Type: AWS::ApiGateway::Model
@@ -56,6 +99,14 @@ Resources:
       ContentType: 'application/json'
       RestApiId: !Ref ApiGatewayRestApi
       Schema: {}
+
+  TwitterApiGatewayModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: 'application/json'
+      RestApiId: !Ref TwitterApiGatewayRestApi
+      Schema: {}
+
 
   ApiGatewayStage:
     Type: AWS::ApiGateway::Stage
@@ -71,6 +122,22 @@ Resources:
     Properties:
       Description: Lambda API Deployment
       RestApiId: !Ref ApiGatewayRestApi
+
+  TwitterApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref TwitterApiGatewayDeployment
+      Description: Lambda API Stage v1
+      RestApiId: !Ref TwitterApiGatewayRestApi
+      StageName: !Ref "apiStageName"
+
+  TwitterApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: TwitterProxyResourceANY
+    Properties:
+      Description: Twitter Lambda API Deployment
+      RestApiId: !Ref TwitterApiGatewayRestApi
+
 
   ApiGatewayIamRole:
     Type: AWS::IAM::Role
@@ -94,6 +161,9 @@ Resources:
               - Effect: 'Allow'
                 Action: 'lambda:*'
                 Resource: !GetAtt LambdaFunction.Arn
+              - Effect: 'Allow'
+                Action: 'lambda:*'
+                Resource: !GetAtt TwitterLambdaFunction.Arn
   
   LambdaFunction:
     Type: AWS::Lambda::Function
@@ -104,14 +174,79 @@ Resources:
             return { statusCode: 200, body: 'Hello World!' };
           };
       Description: API Lambda function
-      FunctionName: !Ref "twitterLambdaFunctionName"
+      FunctionName: !Ref "dummyLambdaFunctionName"
       Handler: index.handler
       MemorySize: 512
       Role: !GetAtt LambdaIamRole.Arn
       Runtime: nodejs12.x
       Timeout: 60
 
+  TwitterLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          exports.handler = async function(event, context) {
+            return { statusCode: 200, body: 'Hello Twitter!' };
+          };
+      Description: API Lambda function for Twitter
+      FunctionName: !Ref "twitterLambdaFunctionName"
+      Handler: index.handler
+      MemorySize: 512
+      Role: !GetAtt TwitterLambdaIamRole.Arn
+      Runtime: nodejs12.x
+      Timeout: 60
+
   LambdaIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - 'lambda.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Effect: "Allow"
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${dummyLambdaFunctionName}:*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "secretsmanager:DescribeSecret"
+                  - "secretsmanager:GetSecretValue"
+                  - "secretsmanager:PutSecretValue"
+                  - "secretsmanager:UpdateSecretVersionStage"
+                Resource: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*'
+                Condition:
+                  StringEquals:
+                    secretsmanager:resource/AllowRotationLambdaArn: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:cfn-rotation-lambda'
+              -
+                Effect: "Allow"
+                Action:
+                  - "secretsmanager:GetRandomPassword"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "kms:Decrypt"
+                  - "kms:DescribeKey"
+                  - "kms:GenerateDataKey"
+                Resource: "*"
+          PolicyName: !Join ["", [{"Ref": "AWS::StackName"}, "-lambda-log"]]
+
+  TwitterLambdaIamRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -160,18 +295,32 @@ Resources:
                 Resource: "*"
           PolicyName: !Join ["", [{"Ref": "AWS::StackName"}, "-lambda-log"]]
 
-  LambdaPermission:
+
+  DummyLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !GetAtt LambdaFunction.Arn
       Action: lambda:InvokeFunction
       Principal: 'apigateway.amazonaws.com'
 
-  LambdaLogGroup:
+  TwitterLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt TwitterLambdaFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: 'apigateway.amazonaws.com'
+
+  DummyLambdaLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${dummyLambdaFunctionName}"
+      RetentionInDays: 3
+  TwitterLambdaLogGroup:
     Type: "AWS::Logs::LogGroup"
     Properties:
       LogGroupName: !Sub "/aws/lambda/${twitterLambdaFunctionName}"
       RetentionInDays: 3
+
   ApiKey: 
     Type: AWS::ApiGateway::ApiKey
     Properties: 
@@ -186,6 +335,8 @@ Resources:
       ApiStages: 
       - ApiId: !Ref ApiGatewayRestApi
         Stage: !Ref "apiStageName"    
+      - ApiId: !Ref TwitterApiGatewayRestApi
+        Stage: !Ref "apiStageName"  
       Description: !Join [" ", [{"Ref": "AWS::StackName"}, "usage plan"]]
       UsagePlanName: !Join ["", [{"Ref": "AWS::StackName"}, "-usage-plan"]]
   ApiUsagePlanKey:
