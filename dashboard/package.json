@@ -151,5 +151,8 @@
     "presets": [
       "react-app"
     ]
+  },
+  "engines": {
+    "node": "14.17.3"
   }
 }
